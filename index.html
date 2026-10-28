@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>加做病人登記與管理系統</title>
+  <title>使用次數登記與管理系統</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -42,14 +42,14 @@
     <section id="front-page" class="max-w-md mx-auto">
       <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
         <div class="bg-indigo-600 px-6 py-5 text-white">
-          <h2 class="text-xl font-bold">登記加做次數</h2>
+          <h2 class="text-xl font-bold">登記使用次數</h2>
           <p class="text-indigo-100 text-xs mt-1">輸入個人代號（支援前 4 碼快速檢索），系統自動帶出姓名。</p>
         </div>
 
         <form id="checkin-form" class="p-6 space-y-5" onsubmit="handleCheckin(event)">
           <!-- 代號輸入 -->
           <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1.5">醫師卡號</label>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">個人代號 (Code)</label>
             <div class="relative">
               <i data-lucide="barcode" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
               <input type="text" id="input-code" oninput="onCodeInput()" autocomplete="off" placeholder="例如：3842 (至少輸入4碼)" 
@@ -74,7 +74,7 @@
               <span id="current-month-tag" class="text-[10px] bg-slate-200 text-slate-600 font-mono px-2 py-0.5 rounded-full"></span>
             </div>
             <div id="user-name" class="text-lg font-bold text-slate-800 flex items-center min-h-[28px]">
-              <span class="text-slate-400 font-normal text-sm">請輸入醫師卡號...</span>
+              <span class="text-slate-400 font-normal text-sm">請輸入代號進行比對...</span>
             </div>
 
             <!-- 次數提示條 -->
@@ -83,14 +83,14 @@
                 <span>本月已使用次數</span>
                 <span id="usage-text" class="font-mono">0 / 3 次</span>
               </div>
-              <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
                 <div id="usage-progress" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
               </div>
             </div>
           </div>
 
-          <!-- 警示訊息區域 -->
-          <div id="alert-message" class="hidden rounded-xl p-3 text-sm flex items-start space-x-2"></div>
+          <!-- 警示訊息區域（達到 3 次時顯示紅底警告） -->
+          <div id="alert-message" class="hidden rounded-xl p-3.5 text-sm border flex items-start space-x-2.5 shadow-sm transition-all"></div>
 
           <!-- 提交按鈕 -->
           <button type="submit" id="submit-btn" disabled 
@@ -208,7 +208,6 @@
 
   <!-- JavaScript 邏輯 -->
   <script>
-    // 預設資料
     const DEFAULT_USERS = [
       { code: "3842B", name: "王國強" },
       { code: "3842C", name: "李大同" },
@@ -217,9 +216,8 @@
     ];
 
     const MONTHLY_LIMIT = 3;
-    let selectedUser = null; // 當前選定的人員
+    let selectedUser = null;
 
-    // 取得當月 YYYY-MM
     function getCurrentMonthKey() {
       const now = new Date();
       const year = now.getFullYear();
@@ -227,7 +225,6 @@
       return `${year}-${month}`;
     }
 
-    // 初始化 LocalStorage 資料
     function initStorage() {
       if (!localStorage.getItem('users_map')) {
         localStorage.setItem('users_map', JSON.stringify(DEFAULT_USERS));
@@ -245,13 +242,13 @@
       return JSON.parse(localStorage.getItem('checkin_logs') || '[]');
     }
 
-    // 統計當月使用次數
+    // 計算當月特定代號已登記的次數 (比對 YYYY-MM)
     function getUserMonthlyCount(code, monthKey) {
       const logs = getLogs();
-      return logs.filter(log => log.code === code && log.date.startsWith(monthKey)).length;
+      const formatMonth = monthKey.replace('-', '/');
+      return logs.filter(log => log.code === code && (log.date.startsWith(monthKey) || log.date.startsWith(formatMonth))).length;
     }
 
-    // 分頁切換
     function switchTab(tab) {
       const frontPage = document.getElementById('front-page');
       const backPage = document.getElementById('back-page');
@@ -274,14 +271,12 @@
       }
     }
 
-    // ================= 前台輸入與對照邏輯 =================
     function onCodeInput() {
       const inputVal = document.getElementById('input-code').value.trim().toUpperCase();
       const users = getUsers();
       const multiContainer = document.getElementById('multi-user-container');
       const selectUser = document.getElementById('select-user');
 
-      // 重置狀態
       selectedUser = null;
       multiContainer.classList.add('hidden');
       selectUser.innerHTML = '';
@@ -291,17 +286,14 @@
         return;
       }
 
-      // 前綴模糊搜尋 (比對開頭)
       const matches = users.filter(u => u.code.toUpperCase().startsWith(inputVal));
 
       if (matches.length === 0) {
         updateUserInfoDisplay(null, 'error', '⚠️ 查無此代號，請確認或向管理員詢問');
       } else if (matches.length === 1) {
-        // 精確匹配到 1 人
         selectedUser = matches[0];
         updateUserInfoDisplay(selectedUser);
       } else {
-        // 匹配到多個人員 ➔ 顯示選單讓使用者點選
         multiContainer.classList.remove('hidden');
         selectUser.innerHTML = '<option value="">-- 請點選選擇正確的人員 --</option>';
         matches.forEach(m => {
@@ -314,9 +306,12 @@
       }
     }
 
-    // 下拉選單點選後觸發
     function onUserSelected(code) {
-      if (!code) return;
+      if (!code) {
+        selectedUser = null;
+        updateUserInfoDisplay(null, null, '請選擇人員...');
+        return;
+      }
       const users = getUsers();
       selectedUser = users.find(u => u.code === code);
       if (selectedUser) {
@@ -324,7 +319,6 @@
       }
     }
 
-    // 更新個人狀態顯示與按鈕啟用
     function updateUserInfoDisplay(user, alertType = null, alertMsg = '') {
       const nameBox = document.getElementById('user-name');
       const alertBox = document.getElementById('alert-message');
@@ -341,7 +335,7 @@
         usageBar.classList.add('hidden');
 
         if (alertType === 'error') {
-          alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-rose-50 text-rose-700 border border-rose-200";
+          alertBox.className = "rounded-xl p-3.5 text-sm flex items-start space-x-2 bg-rose-50 text-rose-700 border border-rose-200";
           alertBox.innerHTML = `<i data-lucide="alert-circle" class="w-5 h-5 shrink-0 mt-0.5"></i><span>${alertMsg}</span>`;
           alertBox.classList.remove('hidden');
         }
@@ -349,38 +343,36 @@
         return;
       }
 
-      // 已選定人員，計算次數
       const monthKey = getCurrentMonthKey();
       const currentCount = getUserMonthlyCount(user.code, monthKey);
       
       nameBox.innerHTML = `<span class="text-indigo-600 font-mono mr-2">[${user.code}]</span>${user.name}`;
       
-      // 顯示進度條
       usageBar.classList.remove('hidden');
       usageText.textContent = `${currentCount} / ${MONTHLY_LIMIT} 次`;
       const percentage = Math.min((currentCount / MONTHLY_LIMIT) * 100, 100);
       usageProgress.style.width = `${percentage}%`;
 
-      // 次數限制判斷
+      // 達到或超過 3 次時觸發警示
       if (currentCount >= MONTHLY_LIMIT) {
         usageProgress.className = "bg-rose-500 h-full w-0 transition-all duration-300";
-        alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-rose-50 text-rose-700 border border-rose-200 shadow-sm";
+        alertBox.className = "rounded-xl p-3.5 text-sm flex items-start space-x-2.5 bg-rose-50 text-rose-700 border border-rose-300 shadow-sm";
         alertBox.innerHTML = `
-          <i data-lucide="alert-octagon" class="w-5 h-5 shrink-0 mt-0.5 text-rose-600"></i>
+          <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0 text-rose-600 mt-0.5"></i>
           <div>
-            <div class="font-bold">無法再登記使用</div>
-            <div class="text-xs mt-0.5">該代號本月使用次數已達上限 (${MONTHLY_LIMIT} 次)，請下個月再行試用。</div>
+            <div class="font-bold text-base">⚠️ 無法再登記使用（已達上限）</div>
+            <div class="text-xs text-rose-600 mt-1 leading-relaxed">該人員本月已登記 ${currentCount} 次，達到上限 ${MONTHLY_LIMIT} 次規定。系統拒絕再次登記。</div>
           </div>`;
         alertBox.classList.remove('hidden');
         submitBtn.disabled = true;
       } else {
         usageProgress.className = "bg-indigo-500 h-full w-0 transition-all duration-300";
-        alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200";
+        alertBox.className = "rounded-xl p-3.5 text-sm flex items-start space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200";
         alertBox.innerHTML = `
-          <i data-lucide="check-circle" class="w-5 h-5 shrink-0 mt-0.5 text-emerald-600"></i>
+          <i data-lucide="check-circle" class="w-5 h-5 shrink-0 text-emerald-600 mt-0.5"></i>
           <div>
             <div class="font-bold">可正常登記</div>
-            <div class="text-xs mt-0.5">本月剩餘可使用次數：${MONTHLY_LIMIT - currentCount} 次。</div>
+            <div class="text-xs text-emerald-700 mt-0.5">本月已使用 ${currentCount} 次，剩餘可使用次數：${MONTHLY_LIMIT - currentCount} 次。</div>
           </div>`;
         alertBox.classList.remove('hidden');
         submitBtn.disabled = false;
@@ -388,234 +380,4 @@
       lucide.createIcons();
     }
 
-    // 執行登記
-    function handleCheckin(e) {
-      e.preventDefault();
-      if (!selectedUser) return;
-
-      const monthKey = getCurrentMonthKey();
-      const currentCount = getUserMonthlyCount(selectedUser.code, monthKey);
-
-      if (currentCount >= MONTHLY_LIMIT) {
-        alert("超過本月使用限制，無法登記！");
-        return;
-      }
-
-      const newLog = {
-        id: Date.now(),
-        date: new Date().toLocaleString('zh-TW', { hour12: false }),
-        code: selectedUser.code,
-        name: selectedUser.name,
-        monthCount: currentCount + 1
-      };
-
-      const logs = getLogs();
-      logs.unshift(newLog);
-      localStorage.setItem('checkin_logs', JSON.stringify(logs));
-
-      alert(`登記成功！\n\n使用者：${selectedUser.name}\n代號：${selectedUser.code}\n本月已使用：${currentCount + 1} / ${MONTHLY_LIMIT} 次`);
-
-      // 重置前台表單
-      document.getElementById('input-code').value = '';
-      document.getElementById('multi-user-container').classList.add('hidden');
-      updateUserInfoDisplay(null, null, '請輸入代號進行比對...');
-    }
-
-    // ================= 後台管理邏輯 =================
-
-    // CSV 上傳解析
-    function handleCSVUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-          const data = results.data;
-          let newUsers = [];
-
-          data.forEach(row => {
-            const code = (row.code || row['代號'] || row.Code || '').toString().trim().toUpperCase();
-            const name = (row.name || row['姓名'] || row.Name || '').toString().trim();
-            if (code && name) {
-              newUsers.push({ code, name });
-            }
-          });
-
-          if (newUsers.length > 0) {
-            const currentUsers = getUsers();
-            // 合併名單並以 code 為 Key 去重
-            const userMap = new Map();
-            currentUsers.forEach(u => userMap.set(u.code, u.name));
-            newUsers.forEach(u => userMap.set(u.code, u.name));
-
-            const updatedList = Array.from(userMap.entries()).map(([code, name]) => ({ code, name }));
-            localStorage.setItem('users_map', JSON.stringify(updatedList));
-
-            alert(`成功匯入 ${newUsers.length} 筆資料！`);
-            renderUserList();
-          } else {
-            alert("CSV 格式不符或無有效資料！請確認標題列包含 'code' 與 'name'。");
-          }
-        }
-      });
-    }
-
-    // 手動新增人員
-    function handleAddUser(e) {
-      e.preventDefault();
-      const code = document.getElementById('new-code').value.trim().toUpperCase();
-      const name = document.getElementById('new-name').value.trim();
-
-      if (!code || !name) return;
-
-      const users = getUsers();
-      const index = users.findIndex(u => u.code === code);
-      if (index >= 0) {
-        users[index].name = name; // 覆蓋舊資料
-      } else {
-        users.push({ code, name });
-      }
-
-      localStorage.setItem('users_map', JSON.stringify(users));
-      document.getElementById('new-code').value = '';
-      document.getElementById('new-name').value = '';
-      renderUserList();
-    }
-
-    // 刪除人員
-    function deleteUser(code) {
-      if (!confirm(`確定要刪除代號 [${code}] 嗎？`)) return;
-      let users = getUsers();
-      users = users.filter(u => u.code !== code);
-      localStorage.setItem('users_map', JSON.stringify(users));
-      renderUserList();
-    }
-
-    // 渲染人員名單
-    function renderUserList() {
-      const users = getUsers();
-      const searchVal = document.getElementById('search-user-input').value.trim().toLowerCase();
-      const listBox = document.getElementById('user-list-box');
-      document.getElementById('user-count').textContent = users.length;
-
-      const filtered = users.filter(u => 
-        u.code.toLowerCase().includes(searchVal) || u.name.toLowerCase().includes(searchVal)
-      );
-
-      listBox.innerHTML = '';
-      if (filtered.length === 0) {
-        listBox.innerHTML = `<div class="text-slate-400 py-2 text-center">查無資料</div>`;
-        return;
-      }
-
-      filtered.forEach(u => {
-        const item = document.createElement('div');
-        item.className = "flex justify-between items-center bg-slate-100 hover:bg-slate-200/70 p-2 rounded-lg transition";
-        item.innerHTML = `
-          <div>
-            <span class="font-bold text-indigo-700 mr-2">${u.code}</span>
-            <span class="text-slate-700">${u.name}</span>
-          </div>
-          <button onclick="deleteUser('${u.code}')" class="text-slate-400 hover:text-rose-600 transition p-1">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
-        `;
-        listBox.appendChild(item);
-      });
-      lucide.createIcons();
-    }
-
-    // 渲染月份篩選器
-    function renderLogsFilter() {
-      const logs = getLogs();
-      const filterSelect = document.getElementById('filter-month');
-      const months = new Set();
-      months.add(getCurrentMonthKey());
-
-      logs.forEach(log => {
-        // 擷取 YYYY-MM 格式
-        const match = log.date.match(/(\d{4})[\/\-](\d{1,2})/);
-        if (match) {
-          const m = `${match[1]}-${String(match[2]).padStart(2, '0')}`;
-          months.add(m);
-        }
-      });
-
-      filterSelect.innerHTML = '';
-      Array.from(months).sort().reverse().forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        filterSelect.appendChild(opt);
-      });
-    }
-
-    // 渲染歷史紀錄表格
-    function renderLogs() {
-      const logs = getLogs();
-      const selectedMonth = document.getElementById('filter-month').value;
-      const tbody = document.getElementById('logs-tbody');
-      tbody.innerHTML = '';
-
-      const filteredLogs = logs.filter(log => {
-        if (!selectedMonth) return true;
-        return log.date.includes(selectedMonth.replace('-', '/')) || log.date.includes(selectedMonth);
-      });
-
-      if (filteredLogs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">當月尚無登記紀錄</td></tr>`;
-        return;
-      }
-
-      filteredLogs.forEach(log => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition";
-        tr.innerHTML = `
-          <td class="px-3 py-2 font-mono text-slate-500">${log.date}</td>
-          <td class="px-3 py-2 font-bold font-mono text-indigo-600">${log.code}</td>
-          <td class="px-3 py-2 text-slate-800 font-medium">${log.name}</td>
-          <td class="px-3 py-2 text-right font-mono font-bold text-slate-700">第 ${log.monthCount} 次</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // 清空歷史紀錄
-    function clearLogs() {
-      if (confirm("確定要清空所有歷史登記紀錄嗎？此動作無法復原。")) {
-        localStorage.setItem('checkin_logs', JSON.stringify([]));
-        renderLogs();
-      }
-    }
-
-    // 匯出紀錄成 CSV
-    function exportLogsCSV() {
-      const logs = getLogs();
-      if (logs.length === 0) {
-        alert("目前沒有紀錄可匯出！");
-        return;
-      }
-
-      let csvContent = "\uFEFF登記時間,個人代號,姓名,當月累積次數\n";
-      logs.forEach(l => {
-        csvContent += `"${l.date}","${l.code}","${l.name}","${l.monthCount}"\n`;
-      });
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `登記紀錄_${getCurrentMonthKey()}.csv`;
-      link.click();
-    }
-
-    // 頁面初次載入時初始化
-    document.addEventListener('DOMContentLoaded', () => {
-      initStorage();
-      document.getElementById('current-month-tag').textContent = `當月: ${getCurrentMonthKey()}`;
-      lucide.createIcons();
-    });
-  </script>
-</body>
-</html>
+    function handleCheckin(e)
