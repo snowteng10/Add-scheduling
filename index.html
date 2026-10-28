@@ -118,6 +118,25 @@
                                 </div>
                             </div>
 
+                            <!-- 新增：登記備註欄位 -->
+                            <div>
+                                <label for="registration-remark" class="block text-sm font-medium text-slate-700 mb-1">
+                                    登記備註（選填）
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                        <i class="fa-solid fa-comment-dots"></i>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        id="registration-remark" 
+                                        placeholder="例如：檢查部位、特殊原因等" 
+                                        autocomplete="off"
+                                        class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 text-sm transition-colors"
+                                    >
+                                </div>
+                            </div>
+
                             <div id="usage-status-card" class="hidden p-4 rounded-xl border">
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center space-x-2">
@@ -189,7 +208,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div class="relative">
                             <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-                            <input type="text" id="log-search-input" oninput="renderLogsTable()" placeholder="搜尋代號或姓名..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="log-search-input" oninput="renderLogsTable()" placeholder="搜尋代號、姓名或備註..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
                             <select id="log-month-filter" onchange="renderLogsTable()" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -202,10 +221,11 @@
                         <table class="w-full text-left text-xs text-slate-600">
                             <thead class="bg-slate-50 text-slate-700 font-semibold sticky top-0 uppercase tracking-wider">
                                 <tr>
-                                    <th class="py-3 px-4">登記時間</th>
-                                    <th class="py-3 px-4">代號</th>
-                                    <th class="py-3 px-4">姓名</th>
-                                    <th class="py-3 px-4 text-center">當月累積狀態</th>
+                                    <th class="py-3 px-3">登記時間</th>
+                                    <th class="py-3 px-3">代號</th>
+                                    <th class="py-3 px-3">姓名</th>
+                                    <th class="py-3 px-3">備註</th>
+                                    <th class="py-3 px-3 text-center">當月累積狀態</th>
                                 </tr>
                             </thead>
                             <tbody id="logs-tbody" class="divide-y divide-slate-100"></tbody>
@@ -278,7 +298,7 @@
         };
 
         const STORAGE_MAPPING_KEY = 'usage_app_mappings_v4';
-        const STORAGE_LOGS_KEY = 'usage_app_logs_v4';
+        const STORAGE_LOGS_KEY = 'usage_app_logs_v5';
 
         let codeMappings = {};
         let usageLogs = [];
@@ -354,445 +374,4 @@
             if (tab === 'user') {
                 userTab.className = "block transition-opacity duration-300";
                 adminTab.className = "hidden transition-opacity duration-300 space-y-8";
-                if(userBtn) userBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-indigo-600 shadow-sm";
-                if(adminBtn) adminBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 text-slate-600 hover:text-slate-900";
-            } else {
-                userTab.className = "hidden transition-opacity duration-300";
-                adminTab.className = "block transition-opacity duration-300 space-y-8";
-                if(adminBtn) adminBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-indigo-600 shadow-sm";
-                if(userBtn) userBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 text-slate-600 hover:text-slate-900";
-                
-                renderLogsTable();
-                renderMappingTable();
-                updateDashboardStats();
-                populateMonthFilterOptions();
-            }
-        }
-
-        function getUserUsageCountForMonth(code, monthKey) {
-            return usageLogs.filter(log => log.code === code && log.monthKey === monthKey).length;
-        }
-
-        function onCodeInputChanged() {
-            const codeInput = document.getElementById('user-code-input');
-            if (!codeInput) return;
-            const inputVal = codeInput.value.trim().toUpperCase();
-            
-            const nameDisplay = document.getElementById('mapped-name-display');
-            const alertBox = document.getElementById('limit-alert');
-            const statusCard = document.getElementById('usage-status-card');
-            const submitBtn = document.getElementById('submit-btn');
-            const iconContainer = document.getElementById('code-status-icon');
-            const multiContainer = document.getElementById('multi-user-container');
-            const selectUser = document.getElementById('select-user');
-
-            currentlySelectedUserCode = null;
-            if (multiContainer) multiContainer.classList.add('hidden');
-            if (selectUser) selectUser.innerHTML = '';
-
-            if (!inputVal) {
-                if (nameDisplay) { nameDisplay.innerText = "請輸入代號進行比對（支援前4碼）..."; nameDisplay.className = "text-xl font-bold text-slate-400"; }
-                if (alertBox) alertBox.classList.add('hidden');
-                if (statusCard) statusCard.classList.add('hidden');
-                if (submitBtn) submitBtn.disabled = true;
-                if (iconContainer) iconContainer.innerHTML = '';
-                return;
-            }
-
-            const matchedEntries = Object.entries(codeMappings).filter(([code, name]) => code.toUpperCase().startsWith(inputVal));
-
-            if (matchedEntries.length === 0) {
-                if (nameDisplay) { nameDisplay.innerText = "⚠️ 查無此代號，請向管理員確認或上傳名單"; nameDisplay.className = "text-base font-medium text-amber-600"; }
-                if (iconContainer) iconContainer.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>';
-                if (alertBox) alertBox.classList.add('hidden');
-                if (statusCard) statusCard.classList.add('hidden');
-                if (submitBtn) submitBtn.disabled = true;
-            } else if (matchedEntries.length === 1) {
-                const [fullCode, mappedName] = matchedEntries[0];
-                currentlySelectedUserCode = fullCode;
-                displaySelectedUserInfo(fullCode, mappedName);
-            } else {
-                if (nameDisplay) { nameDisplay.innerText = `🔍 找到 ${matchedEntries.length} 筆符合項目，請於下方選單點選`; nameDisplay.className = "text-base font-bold text-indigo-600"; }
-                if (iconContainer) iconContainer.innerHTML = '<i class="fa-solid fa-users text-indigo-500"></i>';
-                
-                if (multiContainer) multiContainer.classList.remove('hidden');
-                if (selectUser) {
-                    selectUser.innerHTML = '<option value="">-- 請點選選擇正確的人員 --</option>';
-                    matchedEntries.forEach(([code, name]) => {
-                        const opt = document.createElement('option');
-                        opt.value = code;
-                        opt.textContent = `${code} - ${name}`;
-                        selectUser.appendChild(opt);
-                    });
-                }
-
-                if (alertBox) alertBox.classList.add('hidden');
-                if (statusCard) statusCard.classList.add('hidden');
-                if (submitBtn) submitBtn.disabled = true;
-            }
-        }
-
-        function onUserSelected(code) {
-            if (!code) {
-                currentlySelectedUserCode = null;
-                const nameDisplay = document.getElementById('mapped-name-display');
-                if (nameDisplay) nameDisplay.innerText = "請選擇人員...";
-                const statusCard = document.getElementById('usage-status-card');
-                if (statusCard) statusCard.classList.add('hidden');
-                const submitBtn = document.getElementById('submit-btn');
-                if (submitBtn) submitBtn.disabled = true;
-                return;
-            }
-
-            currentlySelectedUserCode = code;
-            const mappedName = codeMappings[code];
-            displaySelectedUserInfo(code, mappedName);
-        }
-
-        function displaySelectedUserInfo(code, mappedName) {
-            const nameDisplay = document.getElementById('mapped-name-display');
-            const alertBox = document.getElementById('limit-alert');
-            const statusCard = document.getElementById('usage-status-card');
-            const submitBtn = document.getElementById('submit-btn');
-            const iconContainer = document.getElementById('code-status-icon');
-
-            if (nameDisplay) {
-                nameDisplay.innerHTML = `<span class="text-indigo-600 font-mono mr-2">[${code}]</span>${mappedName}`;
-                nameDisplay.className = "text-2xl font-extrabold text-slate-800";
-            }
-            if (iconContainer) iconContainer.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500"></i>';
-
-            const currentMonth = getCurrentMonthKey();
-            const usageCount = getUserUsageCountForMonth(code, currentMonth);
-            const limit = 3;
-
-            if (statusCard) statusCard.classList.remove('hidden');
-            const counterText = document.getElementById('usage-counter-text');
-            const progressBar = document.getElementById('usage-progress-bar');
-            const remainingHint = document.getElementById('remaining-hint');
-
-            if (counterText) counterText.innerText = `${usageCount} / ${limit} 次`;
-            const percent = Math.min((usageCount / limit) * 100, 100);
-            if (progressBar) progressBar.style.width = `${percent}%`;
-
-            if (usageCount >= limit) {
-                if (alertBox) alertBox.classList.remove('hidden');
-                const alertMsg = document.getElementById('limit-alert-msg');
-                if (alertMsg) alertMsg.innerText = `本月使用次數已達到上限（3次），無法再登記！`;
-                if (progressBar) progressBar.className = "h-2.5 rounded-full transition-all duration-500 bg-rose-500";
-                if (counterText) counterText.className = "text-sm font-bold text-rose-600";
-                if (statusCard) statusCard.className = "p-4 rounded-xl border border-rose-200 bg-rose-50/50";
-                if (remainingHint) { remainingHint.innerText = "該醫師本月可用額度已用完。"; remainingHint.className = "text-xs mt-2 font-semibold text-rose-600 text-right"; }
-                if (submitBtn) submitBtn.disabled = true;
-            } else {
-                if (alertBox) alertBox.classList.add('hidden');
-                const remaining = limit - usageCount;
-                if (progressBar) {
-                    progressBar.className = usageCount === 2 ? "h-2.5 rounded-full transition-all duration-500 bg-amber-500" : "h-2.5 rounded-full transition-all duration-500 bg-emerald-500";
-                }
-                if (counterText) counterText.className = usageCount === 2 ? "text-sm font-bold text-amber-600" : "text-sm font-bold text-emerald-600";
-                if (statusCard) statusCard.className = usageCount === 2 ? "p-4 rounded-xl border border-amber-200 bg-amber-50/50" : "p-4 rounded-xl border border-slate-200 bg-slate-50";
-                if (remainingHint) { remainingHint.innerText = `本月還可以登記 ${remaining} 次`; remainingHint.className = "text-xs mt-2 text-slate-500 text-right"; }
-                if (submitBtn) submitBtn.disabled = false;
-            }
-        }
-
-        function handleRegister(e) {
-            e.preventDefault();
-            if (!currentlySelectedUserCode) return;
-
-            const code = currentlySelectedUserCode;
-            const name = codeMappings[code];
-            const currentMonth = getCurrentMonthKey();
-
-            if (!name) return;
-
-            const currentUsage = getUserUsageCountForMonth(code, currentMonth);
-
-            if (currentUsage >= 3) {
-                showToast("本月使用次數已達上限 3 次，無法登記！", "error");
-                onCodeInputChanged();
-                return;
-            }
-
-            const now = new Date();
-            const timestamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-            const newCount = currentUsage + 1;
-
-            const logItem = {
-                id: Date.now(),
-                timestamp: timestamp,
-                code: code,
-                name: name,
-                monthKey: currentMonth,
-                monthCountAtTime: newCount
-            };
-
-            usageLogs.unshift(logItem);
-            saveLogsToStorage();
-
-            showToast(`登記成功！${name} (${code}) 本月已使用 ${newCount}/3 次`, "success");
-            resetFrontForm();
-        }
-
-        function resetFrontForm() {
-            currentlySelectedUserCode = null;
-            const codeInput = document.getElementById('user-code-input');
-            if (codeInput) codeInput.value = '';
-            const multiContainer = document.getElementById('multi-user-container');
-            if (multiContainer) multiContainer.classList.add('hidden');
-            const selectUser = document.getElementById('select-user');
-            if (selectUser) selectUser.innerHTML = '';
-            const nameDisplay = document.getElementById('mapped-name-display');
-            if (nameDisplay) { nameDisplay.innerText = "請輸入代號進行比對（支援前4碼）..."; nameDisplay.className = "text-xl font-bold text-slate-400"; }
-            const alertBox = document.getElementById('limit-alert');
-            if (alertBox) alertBox.classList.add('hidden');
-            const statusCard = document.getElementById('usage-status-card');
-            if (statusCard) statusCard.classList.add('hidden');
-            const submitBtn = document.getElementById('submit-btn');
-            if (submitBtn) submitBtn.disabled = true;
-            const iconContainer = document.getElementById('code-status-icon');
-            if (iconContainer) iconContainer.innerHTML = '';
-        }
-
-        function showToast(message, type = "info") {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            toast.className = "pointer-events-auto flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all duration-300 transform translate-y-2 opacity-0 " + (type === "success" ? "bg-emerald-600" : type === "error" ? "bg-rose-600" : "bg-slate-800");
-            toast.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : type === 'error' ? 'circle-xmark' : 'circle-info'}"></i> <span>${message}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        function handleCSVImport(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            if (typeof Papa === 'undefined') {
-                showToast("CSV 解析模組載入失敗", "error");
-                return;
-            }
-
-            Papa.parse(file, {
-                header: false,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    const rows = results.data;
-                    let importedCount = 0;
-
-                    rows.forEach(row => {
-                        if (row.length >= 2) {
-                            const code = row[0].replace(/"/g, '').trim().toUpperCase();
-                            const name = row[1].replace(/"/g, '').trim();
-                            if (code && name && code !== '代號' && code !== 'CODE') {
-                                codeMappings[code] = name;
-                                importedCount++;
-                            }
-                        }
-                    });
-
-                    if (importedCount > 0) {
-                        saveMappingsToStorage();
-                        renderMappingTable();
-                        updateDashboardStats();
-                        showToast(`成功匯入 ${importedCount} 筆人員代號對照資料！`, "success");
-                    } else {
-                        showToast("未讀取到有效的 CSV 資料", "error");
-                    }
-                    const csvInput = document.getElementById('csv-file-input');
-                    if(csvInput) csvInput.value = '';
-                }
-            });
-        }
-
-        function downloadCSVTemplate() {
-            const templateContent = "data:text/csv;charset=utf-8,\uFEFF代號,姓名\nA01,張小明\nA02,李大同\nB01,陳美玲\n";
-            const encodedUri = encodeURI(templateContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "人員代號對照表範本.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function renderLogsTable() {
-            const tbody = document.getElementById('logs-tbody');
-            const noLogsMsg = document.getElementById('no-logs-msg');
-            const searchInput = document.getElementById('log-search-input');
-            const monthFilter = document.getElementById('log-month-filter');
-
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            const searchKeyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
-            const filterVal = monthFilter ? monthFilter.value : 'ALL';
-
-            let filtered = usageLogs.filter(log => {
-                const matchSearch = log.code.toLowerCase().includes(searchKeyword) || log.name.toLowerCase().includes(searchKeyword);
-                const matchMonth = filterVal === 'ALL' || log.monthKey === filterVal;
-                return matchSearch && matchMonth;
-            });
-
-            if (filtered.length === 0) {
-                if (noLogsMsg) noLogsMsg.classList.remove('hidden');
-                return;
-            } else {
-                if (noLogsMsg) noLogsMsg.classList.add('hidden');
-            }
-
-            filtered.forEach(log => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-slate-500">${log.timestamp}</td>
-                    <td class="py-3 px-4 font-semibold font-mono text-indigo-600">${log.code}</td>
-                    <td class="py-3 px-4 text-slate-800 font-medium">${log.name}</td>
-                    <td class="py-3 px-4 text-center">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${log.monthCountAtTime >= 3 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">
-                            第 ${log.monthCountAtTime} 次 / 共3次
-                        </span>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function renderMappingTable() {
-            const tbody = document.getElementById('mapping-tbody');
-            const searchInput = document.getElementById('mapping-search-input');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            const searchVal = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-            Object.entries(codeMappings).forEach(([code, name]) => {
-                if (searchVal && !code.toLowerCase().includes(searchVal) && !name.toLowerCase().includes(searchVal)) {
-                    return;
-                }
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50";
-                tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-mono font-bold text-indigo-600">${code}</td>
-                    <td class="py-2.5 px-3 font-medium text-slate-800">${name}</td>
-                    <td class="py-2.5 px-3 text-right">
-                        <button onclick="deleteMapping('${code}')" class="text-slate-400 hover:text-rose-600 transition-colors p-1" title="刪除">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function handleAddMapping(e) {
-            e.preventDefault();
-            const codeInput = document.getElementById('new-code-input');
-            const nameInput = document.getElementById('new-name-input');
-            if (!codeInput || !nameInput) return;
-
-            const code = codeInput.value.trim().toUpperCase();
-            const name = nameInput.value.trim();
-
-            if (!code || !name) return;
-
-            codeMappings[code] = name;
-            saveMappingsToStorage();
-
-            showToast(`已更新代號 [${code}] : ${name}`, "success");
-            codeInput.value = '';
-            nameInput.value = '';
-
-            renderMappingTable();
-            updateDashboardStats();
-        }
-
-        function deleteMapping(code) {
-            if (confirm(`確定要刪除代號 [${code}] 嗎？`)) {
-                delete codeMappings[code];
-                saveMappingsToStorage();
-                showToast(`已刪除代號 [${code}]`, "info");
-                renderMappingTable();
-                updateDashboardStats();
-            }
-        }
-
-        function updateDashboardStats() {
-            const currentMonth = getCurrentMonthKey();
-            const totalLogsEl = document.getElementById('stat-total-logs');
-            const monthLogsEl = document.getElementById('stat-month-logs');
-            const activeUsersEl = document.getElementById('stat-active-users');
-            const maxedUsersEl = document.getElementById('stat-maxed-users');
-
-            if (totalLogsEl) totalLogsEl.innerText = usageLogs.length;
-
-            const monthLogs = usageLogs.filter(l => l.monthKey === currentMonth);
-            if (monthLogsEl) monthLogsEl.innerText = monthLogs.length;
-
-            if (activeUsersEl) activeUsersEl.innerText = Object.keys(codeMappings).length;
-
-            let maxedCount = 0;
-            Object.keys(codeMappings).forEach(code => {
-                if (getUserUsageCountForMonth(code, currentMonth) >= 3) {
-                    maxedCount++;
-                }
-            });
-            if (maxedUsersEl) maxedUsersEl.innerText = maxedCount;
-        }
-
-        function populateMonthFilterOptions() {
-            const select = document.getElementById('log-month-filter');
-            if (!select) return;
-            const months = Array.from(new Set(usageLogs.map(l => l.monthKey))).sort().reverse();
-            select.innerHTML = '<option value="ALL">所有月份</option>';
-            months.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.innerText = m;
-                select.appendChild(opt);
-            });
-        }
-
-        function exportLogsToCSV() {
-            if (usageLogs.length === 0) {
-                showToast("目前沒有可匯出的紀錄！", "info");
-                return;
-            }
-
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            csvContent += "流水號,登記日期時間,代號,姓名,登記月份,當月累積次數\n";
-
-            usageLogs.forEach(log => {
-                csvContent += `${log.id},"${log.timestamp}","${log.code}","${log.name}","${log.monthKey}",${log.monthCountAtTime}\n`;
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `使用登記歷史紀錄_${getCurrentMonthKey()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            showToast("紀錄 CSV 匯出成功！", "success");
-        }
-
-        function confirmClearLogs() {
-            if (confirm("⚠️ 確定要清空所有登記歷史紀錄嗎？此操作無法復原！")) {
-                usageLogs = [];
-                saveLogsToStorage();
-                renderLogsTable();
-                updateDashboardStats();
-                populateMonthFilterOptions();
-                showToast("所有歷史紀錄已清空", "info");
-            }
-        }
-    </script>
-</body>
-</html>
+                if(userBtn) userBtn.className = "flex items-center space-
