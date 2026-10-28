@@ -1,816 +1,621 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>加做病人登記與後台管理系統</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>加做病人登記與管理系統</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- PapaParse for CSV Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 min-h-screen text-slate-800">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center space-x-3">
-                    <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md">
-                        <i class="fa-solid fa-id-card text-xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-bold text-slate-900 leading-tight">加做病人額度登記系統</h1>
-                        <p class="text-xs text-slate-500">每人每月上限 3 次登記</p>
-                    </div>
-                </div>
+  <!-- 頂部導覽列 -->
+  <header class="bg-indigo-600 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i data-lucide="clipboard-check" class="w-7 h-7"></i>
+        <h1 class="text-xl font-bold tracking-wide">登記與次數管理系統</h1>
+      </div>
+      <div class="flex bg-indigo-700/60 p-1 rounded-xl text-sm font-medium">
+        <button id="tab-front" onclick="switchTab('front')" class="px-4 py-1.5 rounded-lg transition-all bg-white text-indigo-700 shadow-sm">
+          <i data-lucide="user-check" class="w-4 h-4 inline mr-1"></i> 前台登記
+        </button>
+        <button id="tab-back" onclick="switchTab('back')" class="px-4 py-1.5 rounded-lg transition-all text-indigo-100 hover:text-white">
+          <i data-lucide="settings" class="w-4 h-4 inline mr-1"></i> 後台管理
+        </button>
+      </div>
+    </div>
+  </header>
 
-                <!-- Navigation Tabs -->
-                <div class="flex bg-slate-100 p-1 rounded-xl">
-                    <button id="tab-user-btn" onclick="switchTab('user')" class="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-indigo-600 shadow-sm">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                        <span>前台登記</span>
-                    </button>
-                    <button id="tab-admin-btn" onclick="switchTab('admin')" class="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 text-slate-600 hover:text-slate-900">
-                        <i class="fa-solid fa-sliders"></i>
-                        <span>後台管理與紀錄</span>
-                    </button>
-                </div>
-            </div>
+  <!-- 主要內容區 -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- ================= 前台登記頁面 ================= -->
+    <section id="front-page" class="max-w-md mx-auto">
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        <div class="bg-indigo-600 px-6 py-5 text-white">
+          <h2 class="text-xl font-bold">登記加做次數</h2>
+          <p class="text-indigo-100 text-xs mt-1">輸入個人代號（支援前 4 碼快速檢索），系統自動帶出姓名。</p>
         </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <!-- Toast Notification Container -->
-        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-        <!-- USER TAB CONTENT -->
-        <section id="tab-user" class="block transition-opacity duration-300">
-            <div class="max-w-xl mx-auto">
-                <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-                    <!-- Banner -->
-                    <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white">
-                        <h2 class="text-2xl font-bold mb-1">登記加做次數</h2>
-                        <p class="text-indigo-100 text-sm">輸入醫師卡號以進行登記，系統自動比對姓名與當月次數限制。</p>
-                    </div>
-
-                    <div class="p-6 sm:p-8 space-y-6">
-                        <!-- Alert Box for Limit Reached -->
-                        <div id="limit-alert" class="hidden bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-xl animate-pulse">
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0">
-                                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xl mt-0.5"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-bold text-rose-800">無法再進行登記</h3>
-                                    <p id="limit-alert-msg" class="text-xs text-rose-700 mt-1">本月使用次數已達到上限（3次），無法再次使用！</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Registration Form -->
-                        <form id="registration-form" onsubmit="handleRegister(event)" class="space-y-5">
-                            <div>
-                                <label for="user-code-input" class="block text-sm font-medium text-slate-700 mb-1">
-                                    醫師卡號
-                                </label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                        <i class="fa-solid fa-barcode"></i>
-                                    </div>
-                                    <input 
-                                        type="text" 
-                                        id="user-code-input" 
-                                        placeholder="例如：A01, B02" 
-                                        autocomplete="off"
-                                        required 
-                                        oninput="onCodeInputChanged()"
-                                        class="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 uppercase transition-colors"
-                                    >
-                                    <div id="code-status-icon" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Mapped Name Preview Card -->
-                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">自動對照姓名</span>
-                                    <span id="month-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 font-medium">--</span>
-                                </div>
-                                <div id="mapped-name-display" class="text-xl font-bold text-slate-400">
-                                    請輸入有效代號...
-                                </div>
-                            </div>
-
-                            <!-- Usage Status Badge -->
-                            <div id="usage-status-card" class="hidden p-4 rounded-xl border">
-                                <div class="flex justify-between items-center">
-                                    <div class="flex items-center space-x-2">
-                                        <i class="fa-regular fa-calendar-check text-slate-600"></i>
-                                        <span class="text-sm font-medium text-slate-700">本月額度狀態</span>
-                                    </div>
-                                    <span id="usage-counter-text" class="text-sm font-bold">0 / 3 次</span>
-                                </div>
-                                <div class="w-full bg-slate-200 rounded-full h-2.5 mt-2.5 overflow-hidden">
-                                    <div id="usage-progress-bar" class="h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                                </div>
-                                <p id="remaining-hint" class="text-xs mt-2 text-slate-500 text-right"></p>
-                            </div>
-
-                            <!-- Submit Button -->
-                            <button 
-                                type="submit" 
-                                id="submit-btn" 
-                                disabled
-                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center justify-center space-x-2"
-                            >
-                                <i class="fa-solid fa-check"></i>
-                                <span>確認登記使用</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
+        <form id="checkin-form" class="p-6 space-y-5" onsubmit="handleCheckin(event)">
+          <!-- 代號輸入 -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">醫師卡號</label>
+            <div class="relative">
+              <i data-lucide="barcode" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input type="text" id="input-code" oninput="onCodeInput()" autocomplete="off" placeholder="例如：3842 (至少輸入4碼)" 
+                     class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition uppercase text-lg tracking-wider font-mono">
             </div>
-        </section>
+          </div>
 
-        <!-- ADMIN TAB CONTENT -->
-        <section id="tab-admin" class="hidden transition-opacity duration-300 space-y-8">
-            
-            <!-- Dashboard Overview Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                    <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                        <i class="fa-solid fa-list-check text-2xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-slate-500">總累積登記次數</p>
-                        <p id="stat-total-logs" class="text-2xl font-bold text-slate-900">0</p>
-                    </div>
-                </div>
+          <!-- 多筆相符時的選擇下拉選單 -->
+          <div id="multi-user-container" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+            <div class="text-xs font-semibold text-amber-800 flex items-center">
+              <i data-lucide="users" class="w-4 h-4 mr-1"></i> 找到多筆符合代號，請選擇人員：
+            </div>
+            <select id="select-user" onchange="onUserSelected(this.value)" class="w-full bg-white border border-amber-300 rounded-lg p-2 text-sm text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+              <!-- 動態載入選項 -->
+            </select>
+          </div>
 
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                        <i class="fa-solid fa-calendar-day text-2xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-slate-500">本月登記總數</p>
-                        <p id="stat-month-logs" class="text-2xl font-bold text-slate-900">0</p>
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                        <i class="fa-solid fa-address-book text-2xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-slate-500">已建檔代號總數</p>
-                        <p id="stat-active-users" class="text-2xl font-bold text-slate-900">0</p>
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
-                    <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                        <i class="fa-solid fa-circle-exclamation text-2xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-slate-500">本月額度滿額人數</p>
-                        <p id="stat-maxed-users" class="text-2xl font-bold text-slate-900">0</p>
-                    </div>
-                </div>
+          <!-- 自動帶出姓名與當月次數資訊 -->
+          <div id="info-card" class="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs font-medium text-slate-500">自動對照姓名</span>
+              <span id="current-month-tag" class="text-[10px] bg-slate-200 text-slate-600 font-mono px-2 py-0.5 rounded-full"></span>
+            </div>
+            <div id="user-name" class="text-lg font-bold text-slate-800 flex items-center min-h-[28px]">
+              <span class="text-slate-400 font-normal text-sm">請輸入醫師卡號...</span>
             </div>
 
-            <!-- Main Log Table & User Management Split -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <!-- Left 2 Cols: Usage Log Table -->
-                <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-900">使用紀錄歷史</h3>
-                            <p class="text-xs text-slate-500">檢視所有登記錄履與當月累計次數</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button onclick="exportLogsToCSV()" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center space-x-1">
-                                <i class="fa-solid fa-download"></i>
-                                <span>匯出歷史紀錄 CSV</span>
-                            </button>
-                            <button onclick="confirmClearLogs()" class="px-3 py-1.5 text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors flex items-center space-x-1">
-                                <i class="fa-solid fa-trash-can"></i>
-                                <span>清空紀錄</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Search and Filter Tools -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div class="relative">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-                            <input 
-                                type="text" 
-                                id="log-search-input" 
-                                oninput="renderLogsTable()" 
-                                placeholder="搜尋代號或姓名..." 
-                                class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                        </div>
-                        <div>
-                            <select 
-                                id="log-month-filter" 
-                                onchange="renderLogsTable()" 
-                                class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="ALL">所有月份</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Logs Table Container -->
-                    <div class="overflow-x-auto max-h-[450px]">
-                        <table class="w-full text-left text-xs text-slate-600">
-                            <thead class="bg-slate-50 text-slate-700 font-semibold sticky top-0 uppercase tracking-wider">
-                                <tr>
-                                    <th class="py-3 px-4">登記時間</th>
-                                    <th class="py-3 px-4">代號</th>
-                                    <th class="py-3 px-4">姓名</th>
-                                    <th class="py-3 px-4 text-center">當月累積狀態</th>
-                                </tr>
-                            </thead>
-                            <tbody id="logs-tbody" class="divide-y divide-slate-100">
-                            </tbody>
-                        </table>
-                        <div id="no-logs-msg" class="hidden text-center py-8 text-slate-400">
-                            <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
-                            目前無符合條件的使用紀錄
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right 1 Col: Batch CSV Import & User Code Mapping Table -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">代號對照表管理</h3>
-                        <p class="text-xs text-slate-500">支援單筆新增或大量 CSV 批次匯入</p>
-                    </div>
-
-                    <!-- Batch CSV Import Block -->
-                    <div class="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold text-indigo-900 uppercase">批次 CSV 名單匯入</span>
-                            <button onclick="downloadCSVTemplate()" class="text-[11px] text-indigo-600 hover:underline">
-                                <i class="fa-solid fa-file-arrow-down"></i> 下載範本
-                            </button>
-                        </div>
-                        <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
-                        <button onclick="document.getElementById('csv-file-input').click()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-2">
-                            <i class="fa-solid fa-file-csv"></i>
-                            <span>選擇 CSV 名單檔案上傳</span>
-                        </button>
-                        <p class="text-[10px] text-slate-500">檔案格式要求：含「代號」與「姓名」欄位之 CSV 檔。</p>
-                    </div>
-
-                    <!-- Add Single Mapping Form -->
-                    <form onsubmit="handleAddMapping(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                        <h4 class="text-xs font-bold text-slate-700 uppercase">單筆新增或更新人員</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] text-slate-500 mb-1">代號</label>
-                                <input type="text" id="new-code-input" placeholder="例如：A01" required class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] text-slate-500 mb-1">姓名</label>
-                                <input type="text" id="new-name-input" placeholder="例如：王小明" required class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-medium transition-colors">
-                            保存人員對照
-                        </button>
-                    </form>
-
-                    <!-- Search Mapping Input -->
-                    <div>
-                        <input 
-                            type="text" 
-                            id="mapping-search-input" 
-                            oninput="renderMappingTable()" 
-                            placeholder="搜尋已建檔代號/姓名..." 
-                            class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                    </div>
-
-                    <!-- Mapping Table -->
-                    <div class="overflow-y-auto max-h-[260px]">
-                        <table class="w-full text-left text-xs">
-                            <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0">
-                                <tr>
-                                    <th class="py-2 px-3">代號</th>
-                                    <th class="py-2 px-3">姓名</th>
-                                    <th class="py-2 px-3 text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mapping-tbody" class="divide-y divide-slate-100">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
+            <!-- 次數提示條 -->
+            <div id="usage-status-bar" class="hidden mt-3 pt-3 border-t border-slate-200/60">
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span>本月已使用次數</span>
+                <span id="usage-text" class="font-mono">0 / 3 次</span>
+              </div>
+              <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div id="usage-progress" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+              </div>
             </div>
-        </section>
+          </div>
 
-    </main>
+          <!-- 警示訊息區域 -->
+          <div id="alert-message" class="hidden rounded-xl p-3 text-sm flex items-start space-x-2"></div>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 mt-auto">
-        使用次數登記系統 &copy; 2026 - 每月每人額度上限：3 次
-    </footer>
+          <!-- 提交按鈕 -->
+          <button type="submit" id="submit-btn" disabled 
+                  class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2">
+            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            <span>確認登記使用</span>
+          </button>
+        </form>
+      </div>
+    </section>
 
-    <!-- JavaScript Logic -->
-    <script>
-        const DEFAULT_MAPPINGS = {
-            'A01': '張小明',
-            'A02': '李大同',
-            'B01': '陳美玲',
-            'B02': '林志豪',
-            'C01': '黃雅婷',
-            'C02': '許家豪',
-            'D01': '周傑倫',
-            'D02': '蔡依林'
-        };
+    <!-- ================= 後台管理頁面 ================= -->
+    <section id="back-page" class="hidden space-y-6">
+      
+      <!-- 後台功能區卡片網格 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- 左側：新增 / 匯入人員資料 -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-5 space-y-4">
+          <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+            <i data-lucide="user-plus" class="w-5 h-5 text-indigo-600"></i>
+            <h3 class="font-bold text-slate-800">人員對照表管理</h3>
+          </div>
 
-        const STORAGE_MAPPING_KEY = 'usage_app_mappings_v2';
-        const STORAGE_LOGS_KEY = 'usage_app_logs_v2';
+          <!-- CSV 批次匯入 -->
+          <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+            <label class="block text-xs font-bold text-indigo-900 mb-1">批次匯入 CSV 名單</label>
+            <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+            <button onclick="document.getElementById('csv-file-input').click()" class="w-full py-2 px-3 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center space-x-1">
+              <i data-lucide="upload" class="w-4 h-4"></i>
+              <span>選擇 CSV 檔案匯入</span>
+            </button>
+          </div>
 
-        let codeMappings = {};
-        let usageLogs = [];
+          <!-- 單筆新增表單 -->
+          <form onsubmit="handleAddUser(event)" class="space-y-3 pt-1">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">代號 (Code)</label>
+                <input type="text" id="new-code" required placeholder="如：3842B" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">姓名 (Name)</label>
+                <input type="text" id="new-name" required placeholder="如：王國強" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+              </div>
+            </div>
+            <button type="submit" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow transition">
+              新增 / 更新單筆人員
+            </button>
+          </form>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadDataFromStorage();
-            initCurrentMonthBadge();
-            renderLogsTable();
-            renderMappingTable();
-            updateDashboardStats();
-            populateMonthFilterOptions();
+          <!-- 名單搜尋與列表 -->
+          <div class="pt-2 border-t border-slate-100">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-xs font-bold text-slate-600">目前人員名單 (<span id="user-count">0</span>)</span>
+              <input type="text" id="search-user-input" oninput="renderUserList()" placeholder="搜尋代號/姓名..." class="text-xs px-2 py-1 border rounded-md outline-none w-28">
+            </div>
+            <div id="user-list-box" class="max-h-48 overflow-y-auto space-y-1 pr-1 font-mono text-xs">
+              <!-- 動態渲染名單 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 右側：登記紀錄與統計 (佔 2 欄) -->
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-md border border-slate-100 p-5 space-y-4 flex flex-col justify-between">
+          <div>
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="history" class="w-5 h-5 text-indigo-600"></i>
+                <h3 class="font-bold text-slate-800">登記歷史紀錄</h3>
+              </div>
+              
+              <!-- 篩選器與功能按鈕 -->
+              <div class="flex items-center space-x-2">
+                <select id="filter-month" onchange="renderLogs()" class="text-xs border border-slate-300 rounded-lg px-2 py-1.5 outline-none font-mono">
+                  <!-- 月份動態載入 -->
+                </select>
+                <button onclick="exportLogsCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>匯出紀錄</span>
+                </button>
+                <button onclick="clearLogs()" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition">
+                  清空
+                </button>
+              </div>
+            </div>
+
+            <!-- 紀錄表格 -->
+            <div class="mt-4 overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-slate-700 uppercase font-semibold">
+                  <tr>
+                    <th class="px-3 py-2.5 rounded-l-lg">時間</th>
+                    <th class="px-3 py-2.5">代號</th>
+                    <th class="px-3 py-2.5">姓名</th>
+                    <th class="px-3 py-2.5 rounded-r-lg text-right">當月累積次數</th>
+                  </tr>
+                </thead>
+                <tbody id="logs-tbody" class="divide-y divide-slate-100">
+                  <!-- 動態載入歷史紀錄 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="text-right text-xs text-slate-400 pt-3 border-t border-slate-100">
+            提示：資料保存在瀏覽器本地儲存區 (localStorage)。
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <!-- JavaScript 邏輯 -->
+  <script>
+    // 預設資料
+    const DEFAULT_USERS = [
+      { code: "3842B", name: "王國強" },
+      { code: "3842C", name: "李大同" },
+      { code: "73006", name: "陳小美" },
+      { code: "70050", name: "林志豪" }
+    ];
+
+    const MONTHLY_LIMIT = 3;
+    let selectedUser = null; // 當前選定的人員
+
+    // 取得當月 YYYY-MM
+    function getCurrentMonthKey() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    // 初始化 LocalStorage 資料
+    function initStorage() {
+      if (!localStorage.getItem('users_map')) {
+        localStorage.setItem('users_map', JSON.stringify(DEFAULT_USERS));
+      }
+      if (!localStorage.getItem('checkin_logs')) {
+        localStorage.setItem('checkin_logs', JSON.stringify([]));
+      }
+    }
+
+    function getUsers() {
+      return JSON.parse(localStorage.getItem('users_map') || '[]');
+    }
+
+    function getLogs() {
+      return JSON.parse(localStorage.getItem('checkin_logs') || '[]');
+    }
+
+    // 統計當月使用次數
+    function getUserMonthlyCount(code, monthKey) {
+      const logs = getLogs();
+      return logs.filter(log => log.code === code && log.date.startsWith(monthKey)).length;
+    }
+
+    // 分頁切換
+    function switchTab(tab) {
+      const frontPage = document.getElementById('front-page');
+      const backPage = document.getElementById('back-page');
+      const tabFront = document.getElementById('tab-front');
+      const tabBack = document.getElementById('tab-back');
+
+      if (tab === 'front') {
+        frontPage.classList.remove('hidden');
+        backPage.classList.add('hidden');
+        tabFront.className = "px-4 py-1.5 rounded-lg transition-all bg-white text-indigo-700 shadow-sm";
+        tabBack.className = "px-4 py-1.5 rounded-lg transition-all text-indigo-100 hover:text-white";
+      } else {
+        frontPage.classList.add('hidden');
+        backPage.classList.remove('hidden');
+        tabBack.className = "px-4 py-1.5 rounded-lg transition-all bg-white text-indigo-700 shadow-sm";
+        tabFront.className = "px-4 py-1.5 rounded-lg transition-all text-indigo-100 hover:text-white";
+        renderUserList();
+        renderLogsFilter();
+        renderLogs();
+      }
+    }
+
+    // ================= 前台輸入與對照邏輯 =================
+    function onCodeInput() {
+      const inputVal = document.getElementById('input-code').value.trim().toUpperCase();
+      const users = getUsers();
+      const multiContainer = document.getElementById('multi-user-container');
+      const selectUser = document.getElementById('select-user');
+
+      // 重置狀態
+      selectedUser = null;
+      multiContainer.classList.add('hidden');
+      selectUser.innerHTML = '';
+
+      if (inputVal.length < 3) {
+        updateUserInfoDisplay(null, null, '請輸入代號進行比對...');
+        return;
+      }
+
+      // 前綴模糊搜尋 (比對開頭)
+      const matches = users.filter(u => u.code.toUpperCase().startsWith(inputVal));
+
+      if (matches.length === 0) {
+        updateUserInfoDisplay(null, 'error', '⚠️ 查無此代號，請確認或向管理員詢問');
+      } else if (matches.length === 1) {
+        // 精確匹配到 1 人
+        selectedUser = matches[0];
+        updateUserInfoDisplay(selectedUser);
+      } else {
+        // 匹配到多個人員 ➔ 顯示選單讓使用者點選
+        multiContainer.classList.remove('hidden');
+        selectUser.innerHTML = '<option value="">-- 請點選選擇正確的人員 --</option>';
+        matches.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.code;
+          opt.textContent = `${m.code} - ${m.name}`;
+          selectUser.appendChild(opt);
         });
+        updateUserInfoDisplay(null, 'warning', `🔍 找到 ${matches.length} 筆符合項目，請於上方點選選擇`);
+      }
+    }
 
-        function getCurrentMonthKey() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            return `${year}-${month}`;
+    // 下拉選單點選後觸發
+    function onUserSelected(code) {
+      if (!code) return;
+      const users = getUsers();
+      selectedUser = users.find(u => u.code === code);
+      if (selectedUser) {
+        updateUserInfoDisplay(selectedUser);
+      }
+    }
+
+    // 更新個人狀態顯示與按鈕啟用
+    function updateUserInfoDisplay(user, alertType = null, alertMsg = '') {
+      const nameBox = document.getElementById('user-name');
+      const alertBox = document.getElementById('alert-message');
+      const submitBtn = document.getElementById('submit-btn');
+      const usageBar = document.getElementById('usage-status-bar');
+      const usageText = document.getElementById('usage-text');
+      const usageProgress = document.getElementById('usage-progress');
+
+      alertBox.classList.add('hidden');
+      submitBtn.disabled = true;
+
+      if (!user) {
+        nameBox.innerHTML = `<span class="text-slate-400 font-normal text-sm">${alertMsg}</span>`;
+        usageBar.classList.add('hidden');
+
+        if (alertType === 'error') {
+          alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-rose-50 text-rose-700 border border-rose-200";
+          alertBox.innerHTML = `<i data-lucide="alert-circle" class="w-5 h-5 shrink-0 mt-0.5"></i><span>${alertMsg}</span>`;
+          alertBox.classList.remove('hidden');
         }
+        lucide.createIcons();
+        return;
+      }
 
-        function initCurrentMonthBadge() {
-            document.getElementById('month-badge').innerText = `本月: ${getCurrentMonthKey()}`;
-        }
+      // 已選定人員，計算次數
+      const monthKey = getCurrentMonthKey();
+      const currentCount = getUserMonthlyCount(user.code, monthKey);
+      
+      nameBox.innerHTML = `<span class="text-indigo-600 font-mono mr-2">[${user.code}]</span>${user.name}`;
+      
+      // 顯示進度條
+      usageBar.classList.remove('hidden');
+      usageText.textContent = `${currentCount} / ${MONTHLY_LIMIT} 次`;
+      const percentage = Math.min((currentCount / MONTHLY_LIMIT) * 100, 100);
+      usageProgress.style.width = `${percentage}%`;
 
-        function loadDataFromStorage() {
-            const savedMappings = localStorage.getItem(STORAGE_MAPPING_KEY);
-            if (savedMappings) {
-                try { codeMappings = JSON.parse(savedMappings); } catch(e) { codeMappings = { ...DEFAULT_MAPPINGS }; }
-            } else {
-                codeMappings = { ...DEFAULT_MAPPINGS };
-                saveMappingsToStorage();
+      // 次數限制判斷
+      if (currentCount >= MONTHLY_LIMIT) {
+        usageProgress.className = "bg-rose-500 h-full w-0 transition-all duration-300";
+        alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-rose-50 text-rose-700 border border-rose-200 shadow-sm";
+        alertBox.innerHTML = `
+          <i data-lucide="alert-octagon" class="w-5 h-5 shrink-0 mt-0.5 text-rose-600"></i>
+          <div>
+            <div class="font-bold">無法再登記使用</div>
+            <div class="text-xs mt-0.5">該代號本月使用次數已達上限 (${MONTHLY_LIMIT} 次)，請下個月再行試用。</div>
+          </div>`;
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = true;
+      } else {
+        usageProgress.className = "bg-indigo-500 h-full w-0 transition-all duration-300";
+        alertBox.className = "rounded-xl p-3 text-sm flex items-start space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200";
+        alertBox.innerHTML = `
+          <i data-lucide="check-circle" class="w-5 h-5 shrink-0 mt-0.5 text-emerald-600"></i>
+          <div>
+            <div class="font-bold">可正常登記</div>
+            <div class="text-xs mt-0.5">本月剩餘可使用次數：${MONTHLY_LIMIT - currentCount} 次。</div>
+          </div>`;
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+      }
+      lucide.createIcons();
+    }
+
+    // 執行登記
+    function handleCheckin(e) {
+      e.preventDefault();
+      if (!selectedUser) return;
+
+      const monthKey = getCurrentMonthKey();
+      const currentCount = getUserMonthlyCount(selectedUser.code, monthKey);
+
+      if (currentCount >= MONTHLY_LIMIT) {
+        alert("超過本月使用限制，無法登記！");
+        return;
+      }
+
+      const newLog = {
+        id: Date.now(),
+        date: new Date().toLocaleString('zh-TW', { hour12: false }),
+        code: selectedUser.code,
+        name: selectedUser.name,
+        monthCount: currentCount + 1
+      };
+
+      const logs = getLogs();
+      logs.unshift(newLog);
+      localStorage.setItem('checkin_logs', JSON.stringify(logs));
+
+      alert(`登記成功！\n\n使用者：${selectedUser.name}\n代號：${selectedUser.code}\n本月已使用：${currentCount + 1} / ${MONTHLY_LIMIT} 次`);
+
+      // 重置前台表單
+      document.getElementById('input-code').value = '';
+      document.getElementById('multi-user-container').classList.add('hidden');
+      updateUserInfoDisplay(null, null, '請輸入代號進行比對...');
+    }
+
+    // ================= 後台管理邏輯 =================
+
+    // CSV 上傳解析
+    function handleCSVUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          const data = results.data;
+          let newUsers = [];
+
+          data.forEach(row => {
+            const code = (row.code || row['代號'] || row.Code || '').toString().trim().toUpperCase();
+            const name = (row.name || row['姓名'] || row.Name || '').toString().trim();
+            if (code && name) {
+              newUsers.push({ code, name });
             }
+          });
 
-            const savedLogs = localStorage.getItem(STORAGE_LOGS_KEY);
-            if (savedLogs) {
-                try { usageLogs = JSON.parse(savedLogs); } catch(e) { usageLogs = []; }
-            } else {
-                const currentMonth = getCurrentMonthKey();
-                usageLogs = [
-                    { id: 1, timestamp: `${currentMonth}-02 09:30:15`, code: 'A01', name: '張小明', monthKey: currentMonth, monthCountAtTime: 1 },
-                    { id: 2, timestamp: `${currentMonth}-05 14:20:00`, code: 'A01', name: '張小明', monthKey: currentMonth, monthCountAtTime: 2 },
-                    { id: 3, timestamp: `${currentMonth}-08 11:10:45`, code: 'B01', name: '陳美玲', monthKey: currentMonth, monthCountAtTime: 1 }
-                ];
-                saveLogsToStorage();
-            }
+          if (newUsers.length > 0) {
+            const currentUsers = getUsers();
+            // 合併名單並以 code 為 Key 去重
+            const userMap = new Map();
+            currentUsers.forEach(u => userMap.set(u.code, u.name));
+            newUsers.forEach(u => userMap.set(u.code, u.name));
+
+            const updatedList = Array.from(userMap.entries()).map(([code, name]) => ({ code, name }));
+            localStorage.setItem('users_map', JSON.stringify(updatedList));
+
+            alert(`成功匯入 ${newUsers.length} 筆資料！`);
+            renderUserList();
+          } else {
+            alert("CSV 格式不符或無有效資料！請確認標題列包含 'code' 與 'name'。");
+          }
         }
+      });
+    }
 
-        function saveMappingsToStorage() {
-            localStorage.setItem(STORAGE_MAPPING_KEY, JSON.stringify(codeMappings));
+    // 手動新增人員
+    function handleAddUser(e) {
+      e.preventDefault();
+      const code = document.getElementById('new-code').value.trim().toUpperCase();
+      const name = document.getElementById('new-name').value.trim();
+
+      if (!code || !name) return;
+
+      const users = getUsers();
+      const index = users.findIndex(u => u.code === code);
+      if (index >= 0) {
+        users[index].name = name; // 覆蓋舊資料
+      } else {
+        users.push({ code, name });
+      }
+
+      localStorage.setItem('users_map', JSON.stringify(users));
+      document.getElementById('new-code').value = '';
+      document.getElementById('new-name').value = '';
+      renderUserList();
+    }
+
+    // 刪除人員
+    function deleteUser(code) {
+      if (!confirm(`確定要刪除代號 [${code}] 嗎？`)) return;
+      let users = getUsers();
+      users = users.filter(u => u.code !== code);
+      localStorage.setItem('users_map', JSON.stringify(users));
+      renderUserList();
+    }
+
+    // 渲染人員名單
+    function renderUserList() {
+      const users = getUsers();
+      const searchVal = document.getElementById('search-user-input').value.trim().toLowerCase();
+      const listBox = document.getElementById('user-list-box');
+      document.getElementById('user-count').textContent = users.length;
+
+      const filtered = users.filter(u => 
+        u.code.toLowerCase().includes(searchVal) || u.name.toLowerCase().includes(searchVal)
+      );
+
+      listBox.innerHTML = '';
+      if (filtered.length === 0) {
+        listBox.innerHTML = `<div class="text-slate-400 py-2 text-center">查無資料</div>`;
+        return;
+      }
+
+      filtered.forEach(u => {
+        const item = document.createElement('div');
+        item.className = "flex justify-between items-center bg-slate-100 hover:bg-slate-200/70 p-2 rounded-lg transition";
+        item.innerHTML = `
+          <div>
+            <span class="font-bold text-indigo-700 mr-2">${u.code}</span>
+            <span class="text-slate-700">${u.name}</span>
+          </div>
+          <button onclick="deleteUser('${u.code}')" class="text-slate-400 hover:text-rose-600 transition p-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+        listBox.appendChild(item);
+      });
+      lucide.createIcons();
+    }
+
+    // 渲染月份篩選器
+    function renderLogsFilter() {
+      const logs = getLogs();
+      const filterSelect = document.getElementById('filter-month');
+      const months = new Set();
+      months.add(getCurrentMonthKey());
+
+      logs.forEach(log => {
+        // 擷取 YYYY-MM 格式
+        const match = log.date.match(/(\d{4})[\/\-](\d{1,2})/);
+        if (match) {
+          const m = `${match[1]}-${String(match[2]).padStart(2, '0')}`;
+          months.add(m);
         }
+      });
 
-        function saveLogsToStorage() {
-            localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(usageLogs));
-        }
+      filterSelect.innerHTML = '';
+      Array.from(months).sort().reverse().forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        filterSelect.appendChild(opt);
+      });
+    }
 
-        function switchTab(tab) {
-            const userTab = document.getElementById('tab-user');
-            const adminTab = document.getElementById('tab-admin');
-            const userBtn = document.getElementById('tab-user-btn');
-            const adminBtn = document.getElementById('tab-admin-btn');
+    // 渲染歷史紀錄表格
+    function renderLogs() {
+      const logs = getLogs();
+      const selectedMonth = document.getElementById('filter-month').value;
+      const tbody = document.getElementById('logs-tbody');
+      tbody.innerHTML = '';
 
-            if (tab === 'user') {
-                userTab.classList.remove('hidden');
-                adminTab.classList.add('hidden');
-                userBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-indigo-600 shadow-sm";
-                adminBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 text-slate-600 hover:text-slate-900";
-            } else {
-                userTab.classList.add('hidden');
-                adminTab.classList.remove('hidden');
-                adminBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-indigo-600 shadow-sm";
-                userBtn.className = "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 text-slate-600 hover:text-slate-900";
-                
-                renderLogsTable();
-                renderMappingTable();
-                updateDashboardStats();
-                populateMonthFilterOptions();
-            }
-        }
+      const filteredLogs = logs.filter(log => {
+        if (!selectedMonth) return true;
+        return log.date.includes(selectedMonth.replace('-', '/')) || log.date.includes(selectedMonth);
+      });
 
-        function getUserUsageCountForMonth(code, monthKey) {
-            return usageLogs.filter(log => log.code === code && log.monthKey === monthKey).length;
-        }
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">當月尚無登記紀錄</td></tr>`;
+        return;
+      }
 
-        function onCodeInputChanged() {
-            const codeInput = document.getElementById('user-code-input');
-            const rawCode = codeInput.value.trim().toUpperCase();
-            codeInput.value = rawCode;
+      filteredLogs.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition";
+        tr.innerHTML = `
+          <td class="px-3 py-2 font-mono text-slate-500">${log.date}</td>
+          <td class="px-3 py-2 font-bold font-mono text-indigo-600">${log.code}</td>
+          <td class="px-3 py-2 text-slate-800 font-medium">${log.name}</td>
+          <td class="px-3 py-2 text-right font-mono font-bold text-slate-700">第 ${log.monthCount} 次</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
-            const nameDisplay = document.getElementById('mapped-name-display');
-            const alertBox = document.getElementById('limit-alert');
-            const statusCard = document.getElementById('usage-status-card');
-            const submitBtn = document.getElementById('submit-btn');
-            const iconContainer = document.getElementById('code-status-icon');
+    // 清空歷史紀錄
+    function clearLogs() {
+      if (confirm("確定要清空所有歷史登記紀錄嗎？此動作無法復原。")) {
+        localStorage.setItem('checkin_logs', JSON.stringify([]));
+        renderLogs();
+      }
+    }
 
-            if (!rawCode) {
-                nameDisplay.innerText = "請輸入有效代號...";
-                nameDisplay.className = "text-xl font-bold text-slate-400";
-                alertBox.classList.add('hidden');
-                statusCard.classList.add('hidden');
-                submitBtn.disabled = true;
-                iconContainer.innerHTML = '';
-                return;
-            }
+    // 匯出紀錄成 CSV
+    function exportLogsCSV() {
+      const logs = getLogs();
+      if (logs.length === 0) {
+        alert("目前沒有紀錄可匯出！");
+        return;
+      }
 
-            const mappedName = codeMappings[rawCode];
+      let csvContent = "\uFEFF登記時間,個人代號,姓名,當月累積次數\n";
+      logs.forEach(l => {
+        csvContent += `"${l.date}","${l.code}","${l.name}","${l.monthCount}"\n`;
+      });
 
-            if (mappedName) {
-                nameDisplay.innerText = mappedName;
-                nameDisplay.className = "text-2xl font-extrabold text-slate-800";
-                iconContainer.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-500"></i>';
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `登記紀錄_${getCurrentMonthKey()}.csv`;
+      link.click();
+    }
 
-                const currentMonth = getCurrentMonthKey();
-                const usageCount = getUserUsageCountForMonth(rawCode, currentMonth);
-                const limit = 3;
-
-                statusCard.classList.remove('hidden');
-                const counterText = document.getElementById('usage-counter-text');
-                const progressBar = document.getElementById('usage-progress-bar');
-                const remainingHint = document.getElementById('remaining-hint');
-
-                counterText.innerText = `${usageCount} / ${limit} 次`;
-                const percent = Math.min((usageCount / limit) * 100, 100);
-                progressBar.style.width = `${percent}%`;
-
-                if (usageCount >= limit) {
-                    alertBox.classList.remove('hidden');
-                    document.getElementById('limit-alert-msg').innerText = `本月使用次數已達上限（3次），無法再登記！`;
-                    progressBar.className = "h-2.5 rounded-full transition-all duration-500 bg-rose-500";
-                    counterText.className = "text-sm font-bold text-rose-600";
-                    statusCard.className = "p-4 rounded-xl border border-rose-200 bg-rose-50/50";
-                    remainingHint.innerText = "您本月可用額度已用完。";
-                    remainingHint.className = "text-xs mt-2 font-semibold text-rose-600 text-right";
-                    submitBtn.disabled = true;
-                } else {
-                    alertBox.classList.add('hidden');
-                    const remaining = limit - usageCount;
-                    if (usageCount === 2) {
-                        progressBar.className = "h-2.5 rounded-full transition-all duration-500 bg-amber-500";
-                        counterText.className = "text-sm font-bold text-amber-600";
-                        statusCard.className = "p-4 rounded-xl border border-amber-200 bg-amber-50/50";
-                    } else {
-                        progressBar.className = "h-2.5 rounded-full transition-all duration-500 bg-emerald-500";
-                        counterText.className = "text-sm font-bold text-emerald-600";
-                        statusCard.className = "p-4 rounded-xl border border-slate-200 bg-slate-50";
-                    }
-                    remainingHint.innerText = `本月還可以登記 ${remaining} 次`;
-                    remainingHint.className = "text-xs mt-2 text-slate-500 text-right";
-                    submitBtn.disabled = false;
-                }
-
-            } else {
-                nameDisplay.innerText = "⚠️ 查無此代號，請向管理員確認或上傳名單";
-                nameDisplay.className = "text-base font-medium text-amber-600";
-                iconContainer.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>';
-                alertBox.classList.add('hidden');
-                statusCard.classList.add('hidden');
-                submitBtn.disabled = true;
-            }
-        }
-
-        function handleRegister(e) {
-            e.preventDefault();
-            const codeInput = document.getElementById('user-code-input');
-            const code = codeInput.value.trim().toUpperCase();
-            const name = codeMappings[code];
-            const currentMonth = getCurrentMonthKey();
-
-            if (!name) return;
-
-            const currentUsage = getUserUsageCountForMonth(code, currentMonth);
-
-            if (currentUsage >= 3) {
-                showToast("本月使用次數已達上限 3 次，無法登記！", "error");
-                onCodeInputChanged();
-                return;
-            }
-
-            const now = new Date();
-            const timestamp = formatDate(now);
-            const newCount = currentUsage + 1;
-
-            const logItem = {
-                id: Date.now(),
-                timestamp: timestamp,
-                code: code,
-                name: name,
-                monthKey: currentMonth,
-                monthCountAtTime: newCount
-            };
-
-            usageLogs.unshift(logItem);
-            saveLogsToStorage();
-
-            showToast(`登記成功！${name} 本月已使用 ${newCount}/3 次`, "success");
-            codeInput.value = '';
-            onCodeInputChanged();
-        }
-
-        function formatDate(d) {
-            const pad = (n) => String(n).padStart(2, '0');
-            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-        }
-
-        function showToast(message, type = "info") {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = "pointer-events-auto flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all duration-300 transform translate-y-2 opacity-0";
-            
-            if (type === "success") {
-                toast.classList.add('bg-emerald-600');
-                toast.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>${message}</span>`;
-            } else if (type === "error") {
-                toast.classList.add('bg-rose-600');
-                toast.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>${message}</span>`;
-            } else {
-                toast.classList.add('bg-slate-800');
-                toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${message}</span>`;
-            }
-
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        // --- CSV Import/Export Functions ---
-
-        function handleCSVImport(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                parseCSVAndImport(text);
-            };
-            reader.readAsText(file);
-        }
-
-        function parseCSVAndImport(csvText) {
-            const lines = csvText.split(/\r\n|\n/);
-            let importedCount = 0;
-
-            lines.forEach((line, index) => {
-                if (!line.trim()) return;
-                const parts = line.split(',');
-                if (parts.length >= 2) {
-                    const code = parts[0].replace(/"/g, '').trim().toUpperCase();
-                    const name = parts[1].replace(/"/g, '').trim();
-
-                    // Skip header row
-                    if (code === '代號' || code === 'CODE') return;
-
-                    if (code && name) {
-                        codeMappings[code] = name;
-                        importedCount++;
-                    }
-                }
-            });
-
-            if (importedCount > 0) {
-                saveMappingsToStorage();
-                renderMappingTable();
-                updateDashboardStats();
-                showToast(`成功匯入 ${importedCount} 筆人員代號對照資料！`, "success");
-            } else {
-                showToast("未讀取到有效的 CSV 資料，請檢查格式", "error");
-            }
-
-            document.getElementById('csv-file-input').value = '';
-        }
-
-        function downloadCSVTemplate() {
-            const templateContent = "data:text/csv;charset=utf-8,\uFEFF代號,姓名\nA01,張小明\nA02,李大同\nB01,陳美玲\n";
-            const encodedUri = encodeURI(templateContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "人員代號對照表範本.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // --- ADMIN FUNCTIONS ---
-
-        function renderLogsTable() {
-            const tbody = document.getElementById('logs-tbody');
-            const noLogsMsg = document.getElementById('no-logs-msg');
-            const searchKeyword = document.getElementById('log-search-input').value.trim().toLowerCase();
-            const monthFilter = document.getElementById('log-month-filter').value;
-
-            tbody.innerHTML = '';
-
-            let filtered = usageLogs.filter(log => {
-                const matchSearch = log.code.toLowerCase().includes(searchKeyword) || log.name.toLowerCase().includes(searchKeyword);
-                const matchMonth = monthFilter === 'ALL' || log.monthKey === monthFilter;
-                return matchSearch && matchMonth;
-            });
-
-            if (filtered.length === 0) {
-                noLogsMsg.classList.remove('hidden');
-                return;
-            } else {
-                noLogsMsg.classList.add('hidden');
-            }
-
-            filtered.forEach(log => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-slate-500">${log.timestamp}</td>
-                    <td class="py-3 px-4 font-semibold font-mono text-indigo-600">${log.code}</td>
-                    <td class="py-3 px-4 text-slate-800 font-medium">${log.name}</td>
-                    <td class="py-3 px-4 text-center">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            log.monthCountAtTime >= 3 
-                                ? 'bg-rose-100 text-rose-700' 
-                                : 'bg-slate-100 text-slate-700'
-                        }">
-                            第 ${log.monthCountAtTime} 次 / 共3次
-                        </span>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function renderMappingTable() {
-            const tbody = document.getElementById('mapping-tbody');
-            const searchInput = document.getElementById('mapping-search-input').value.trim().toLowerCase();
-            tbody.innerHTML = '';
-
-            Object.entries(codeMappings).forEach(([code, name]) => {
-                if (searchInput && !code.toLowerCase().includes(searchInput) && !name.toLowerCase().includes(searchInput)) {
-                    return;
-                }
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50";
-                tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-mono font-bold text-indigo-600">${code}</td>
-                    <td class="py-2.5 px-3 font-medium text-slate-800">${name}</td>
-                    <td class="py-2.5 px-3 text-right">
-                        <button onclick="deleteMapping('${code}')" class="text-slate-400 hover:text-rose-600 transition-colors p-1" title="刪除">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function handleAddMapping(e) {
-            e.preventDefault();
-            const codeInput = document.getElementById('new-code-input');
-            const nameInput = document.getElementById('new-name-input');
-            const code = codeInput.value.trim().toUpperCase();
-            const name = nameInput.value.trim();
-
-            if (!code || !name) return;
-
-            codeMappings[code] = name;
-            saveMappingsToStorage();
-
-            showToast(`已更新代號 [${code}] : ${name}`, "success");
-            codeInput.value = '';
-            nameInput.value = '';
-
-            renderMappingTable();
-            updateDashboardStats();
-        }
-
-        function deleteMapping(code) {
-            if (confirm(`確定要刪除代號 [${code}] 嗎？`)) {
-                delete codeMappings[code];
-                saveMappingsToStorage();
-                showToast(`已刪除代號 [${code}]`, "info");
-                renderMappingTable();
-                updateDashboardStats();
-            }
-        }
-
-        function updateDashboardStats() {
-            const currentMonth = getCurrentMonthKey();
-            document.getElementById('stat-total-logs').innerText = usageLogs.length;
-
-            const monthLogs = usageLogs.filter(l => l.monthKey === currentMonth);
-            document.getElementById('stat-month-logs').innerText = monthLogs.length;
-
-            const mappedUserCount = Object.keys(codeMappings).length;
-            document.getElementById('stat-active-users').innerText = mappedUserCount;
-
-            let maxedCount = 0;
-            Object.keys(codeMappings).forEach(code => {
-                if (getUserUsageCountForMonth(code, currentMonth) >= 3) {
-                    maxedCount++;
-                }
-            });
-            document.getElementById('stat-maxed-users').innerText = maxedCount;
-        }
-
-        function populateMonthFilterOptions() {
-            const select = document.getElementById('log-month-filter');
-            const months = Array.from(new Set(usageLogs.map(l => l.monthKey))).sort().reverse();
-            select.innerHTML = '<option value="ALL">所有月份</option>';
-            months.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.innerText = m;
-                select.appendChild(opt);
-            });
-        }
-
-        function exportLogsToCSV() {
-            if (usageLogs.length === 0) {
-                showToast("目前沒有可匯出的紀錄！", "info");
-                return;
-            }
-
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            csvContent += "流水號,登記日期時間,代號,姓名,登記月份,當月累積次數\n";
-
-            usageLogs.forEach(log => {
-                csvContent += `${log.id},"${log.timestamp}","${log.code}","${log.name}","${log.monthKey}",${log.monthCountAtTime}\n`;
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `使用登記歷史紀錄_${getCurrentMonthKey()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            showToast("紀錄 CSV 匯出成功！", "success");
-        }
-
-        function confirmClearLogs() {
-            if (confirm("⚠️ 確定要清空所有登記歷史紀錄嗎？此操作無法復原！")) {
-                usageLogs = [];
-                saveLogsToStorage();
-                renderLogsTable();
-                updateDashboardStats();
-                populateMonthFilterOptions();
-                showToast("所有歷史紀錄已清空", "info");
-            }
-        }
-    </script>
+    // 頁面初次載入時初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      initStorage();
+      document.getElementById('current-month-tag').textContent = `當月: ${getCurrentMonthKey()}`;
+      lucide.createIcons();
+    });
+  </script>
 </body>
 </html>
